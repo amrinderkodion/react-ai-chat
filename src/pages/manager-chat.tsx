@@ -14,6 +14,7 @@ import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import Tooltip from '@mui/material/Tooltip';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
+import MessageContent from '../components/MessageContent.tsx';
 
 type Msg = { sender: 'assistant' | 'user'; text: string; t?: number };
 type Session = {
@@ -445,7 +446,8 @@ Assistant:`;
                         whiteSpace: 'pre-line', // <-- preserves line breaks
                       }}
                     >
-                      {m.text}
+                      {/* {m.text} */}
+                      <MessageContent text={m.text} sender={m.sender} />
                     </Box>
                     {m.sender === 'user' && (
                       <Avatar sx={{ width: 28, height: 28, bgcolor: '#eee', color: '#1976d2', fontSize: 16 }}>You</Avatar>
