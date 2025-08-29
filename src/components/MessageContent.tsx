@@ -8,6 +8,7 @@ import List from '@mui/material/List';
 import ListItem from '@mui/material/ListItem';
 import ReactMarkdown from 'react-markdown';
 import type { Components } from 'react-markdown';
+import Chip from '@mui/material/Chip';
 
 
 const Paragraph: Components['p'] = ({ children, ...props }) => (
@@ -21,33 +22,52 @@ const Strong: Components['strong'] = ({ children, ...props }) => (
 );
 
 const UnorderedList: Components['ul'] = ({ children, ...props }) => (
-  <List sx={{ pl: 2, mb: 1 }} {...props}>{children}</List>
+  <List sx={{ pl: 2, listStyleType: 'disc', mb: 1 }} {...props}>{children}</List>
+);
+
+const OrderedList: Components['ol'] = ({ children, ...props }) => (
+  <List sx={{ pl: 2, listStyleType: 'decimal', mb: 1 }} {...props}>{children}</List>
 );
 
 const ListItemContent: Components['li'] = ({ children, ...props }) => (
-  <ListItem sx={{ display: 'list-item', p: 0, '&::before': { content: '"\\2022"', pr: 1.5 } }} {...props}>
+  <ListItem sx={{ display: 'list-item', p: 0, '&::marker': { fontSize: '1.2em' } }} {...props}>
     <Typography component="span">{children}</Typography>
   </ListItem>
 );
 
 const CodeBlock: React.FC<React.PropsWithChildren<any>> = (props) => {
-  const { inline, className, children, ...rest } = props;
+  const { inline, className, children } = props;
   const match = /language-(\w+)/.exec(className || '');
   
-  return !inline && match ? (
-    <Paper elevation={1} sx={{ bgcolor: '#2d2d2d', color: '#f8f8f2', p: 1.5, my: 1, borderRadius: 1, overflowX: 'auto' }}>
-      <pre style={{ margin: 0 }}>
-        <code className={className} {...rest}>
-          {String(children).replace(/\n$/, '')}
-        </code>
-      </pre>
-    </Paper>
-  ) : (
-    <code className={className} {...rest}>
-      {children}
-    </code>
+  if (!inline && match) {
+    const language = match[1];
+    return (
+      <Paper elevation={1} sx={{ bgcolor: '#2d2d2d', color: '#f8f8f2', p: 1.5, my: 1, borderRadius: 1, overflowX: 'auto', position: 'relative' }}>
+        <Chip
+          label={language}
+          size="small"
+          sx={{
+            position: 'absolute',
+            top: 8,
+            right: 8,
+            bgcolor: 'rgba(255, 255, 255, 0.1)',
+            color: '#fff',
+            fontFamily: 'monospace',
+          }}
+        />
+        <pre style={{ margin: 0, marginTop: '16px' }}>
+          <code className={className}>{String(children).replace(/\n$/, '')}</code>
+        </pre>
+      </Paper>
+    );
+  }
+
+  // Handle inline code
+  return (
+    <code className={className}>{children}</code>
   );
 };
+  
 
 type MessageContentProps = {
   text: string;
@@ -75,6 +95,7 @@ const MessageContent = ({ text, sender }:MessageContentProps) => {
           p: Paragraph,
           strong: Strong,
           ul: UnorderedList,
+          ol: OrderedList,
           li: ListItemContent,
           code: CodeBlock,
         }}
