@@ -9,6 +9,9 @@ import ListItem from '@mui/material/ListItem';
 import ReactMarkdown from 'react-markdown';
 import type { Components } from 'react-markdown';
 import Chip from '@mui/material/Chip';
+import Link from '@mui/material/Link';
+import Divider from '@mui/material/Divider';
+
 
 
 const Paragraph: Components['p'] = ({ children, ...props }) => (
@@ -33,6 +36,26 @@ const ListItemContent: Components['li'] = ({ children, ...props }) => (
   <ListItem sx={{ display: 'list-item', p: 0, '&::marker': { fontSize: '1.2em' } }} {...props}>
     <Typography component="span">{children}</Typography>
   </ListItem>
+);
+
+const MarkdownLink: Components['a'] = (props) => (
+  <Link href={props.href} target="_blank" rel="noopener" {...props} />
+);
+
+const Blockquote: Components['blockquote'] = ({ children, ...props }) => (
+  <Box
+    component="blockquote"  // <--- This is the key change
+    sx={{
+      borderLeft: '4px solid #ccc',
+      pl: 2,
+      my: 1,
+      fontStyle: 'italic',
+      color: 'text.secondary',
+    }}
+    {...props}
+  >
+    {children}
+  </Box>
 );
 
 const CodeBlock: React.FC<React.PropsWithChildren<any>> = (props) => {
@@ -98,6 +121,9 @@ const MessageContent = ({ text, sender }:MessageContentProps) => {
           ol: OrderedList,
           li: ListItemContent,
           code: CodeBlock,
+          a: MarkdownLink,
+          blockquote: Blockquote,
+          hr: (props) => <Divider sx={{ my: 2 }} {...props} />,
         }}
       >
         {text}
