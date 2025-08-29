@@ -11,6 +11,12 @@ import type { Components } from 'react-markdown';
 import Chip from '@mui/material/Chip';
 import Link from '@mui/material/Link';
 import Divider from '@mui/material/Divider';
+import TableContainer from '@mui/material/TableContainer';
+import Table from '@mui/material/Table';
+import TableHead from '@mui/material/TableHead';
+import TableBody from '@mui/material/TableBody';
+import TableRow from '@mui/material/TableRow';
+import TableCell from '@mui/material/TableCell';
 
 
 
@@ -40,6 +46,39 @@ const ListItemContent: Components['li'] = ({ children, ...props }) => (
 
 const MarkdownLink: Components['a'] = (props) => (
   <Link href={props.href} target="_blank" rel="noopener" {...props} />
+);
+
+const TableWrapper: Components['table'] = (props) => (
+  <TableContainer component={Paper} sx={{ my: 2 }}>
+    <Table {...props} />
+  </TableContainer>
+);
+
+const TableHeader: Components['thead'] = (props) => <TableHead {...props} />;
+const TableBodyWrapper: Components['tbody'] = (props) => <TableBody {...props} />;
+const TableRowWrapper: Components['tr'] = (props) => <TableRow {...props} />;
+
+const TableCellHeader: Components['th'] = ({ children, align, ...props }) => (
+  <TableCell component="th" sx={{ fontWeight: 'bold' }} {...props}>
+    {children}
+  </TableCell>
+);
+
+const TableCellBody: Components['td'] = ({ children, align, ...props }) => (
+  <TableCell component="td" {...props}>
+    {children}
+  </TableCell>
+);
+
+
+const Image: Components['img'] = (props) => (
+  <Box
+    component="img"
+    src={props.src}
+    alt={props.alt}
+    title={props.title}
+    sx={{ maxWidth: '100%', height: 'auto', display: 'block', margin: 'auto' }}
+  />
 );
 
 const Blockquote: Components['blockquote'] = ({ children, ...props }) => (
@@ -124,6 +163,13 @@ const MessageContent = ({ text, sender }:MessageContentProps) => {
           a: MarkdownLink,
           blockquote: Blockquote,
           hr: (props) => <Divider sx={{ my: 2 }} {...props} />,
+          img: Image,
+          table: TableWrapper,
+          thead: TableHeader,
+          tbody: TableBodyWrapper,
+          tr: TableRowWrapper,
+          th: TableCellHeader,
+          td: TableCellBody,
         }}
       >
         {text}
