@@ -17,6 +17,7 @@ import TableHead from '@mui/material/TableHead';
 import TableBody from '@mui/material/TableBody';
 import TableRow from '@mui/material/TableRow';
 import TableCell from '@mui/material/TableCell';
+import remarkGfm from 'remark-gfm';
 
 
 
@@ -147,6 +148,7 @@ const MessageContent = ({ text, sender }:MessageContentProps) => {
   return (
     <Box>
       <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
         components={{
           h1: ({ node, ...props }) => <Typography variant="h1" component="h1" gutterBottom {...props} />,
           h2: ({ node, ...props }) => <Typography variant="h2" component="h2" gutterBottom {...props} />,
@@ -172,10 +174,17 @@ const MessageContent = ({ text, sender }:MessageContentProps) => {
           td: TableCellBody,
         }}
       >
-        {text}
+        {cleanMarkdown(text)}
       </ReactMarkdown>
     </Box>
   );
+};
+
+const cleanMarkdown = (markdown: string): string => {
+  return markdown
+    .split('\n')
+    .map(line => line.trim())
+    .join('\n');
 };
 
 export default MessageContent;
