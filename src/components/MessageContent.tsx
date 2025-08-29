@@ -50,8 +50,8 @@ const MarkdownLink: Components['a'] = (props) => (
 );
 
 const TableWrapper: Components['table'] = (props) => (
-  <TableContainer component={Paper} sx={{ my: 2 }}>
-    <Table {...props} />
+  <TableContainer sx={{ my: 2 }}>
+    <Table size="small" sx={{ borderCollapse: 'collapse' }} {...props} />
   </TableContainer>
 );
 
@@ -60,13 +60,26 @@ const TableBodyWrapper: Components['tbody'] = (props) => <TableBody {...props} /
 const TableRowWrapper: Components['tr'] = (props) => <TableRow {...props} />;
 
 const TableCellHeader: Components['th'] = ({ children, align, ...props }) => (
-  <TableCell component="th" sx={{ fontWeight: 'bold' }} {...props}>
+  <TableCell component="th" sx={{ 
+      fontWeight: 'bold',
+      border: '1px solid', 
+      borderColor: 'divider', 
+      p: 1.5,
+    }} {...props}
+  >
     {children}
   </TableCell>
 );
 
 const TableCellBody: Components['td'] = ({ children, align, ...props }) => (
-  <TableCell component="td" {...props}>
+  <TableCell component="td" 
+  sx={{
+    border: '1px solid', // Add border to cells
+    borderColor: 'divider', // Use Material-UI's divider color
+    p: 1.5, // Padding for better spacing
+  }}
+  {...props}
+  >
     {children}
   </TableCell>
 );
