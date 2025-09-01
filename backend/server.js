@@ -1,5 +1,8 @@
 const express = require('express');
 const path = require('path');
+const multer = require('multer');
+// Configure multer to store uploaded files in a temporary 'uploads/' directory
+const upload = multer({ dest: 'uploads/' });
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -33,6 +36,71 @@ app.post('/api/assistant', async (req, res) => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           contents: [{ role: 'user', parts: [{ text: userMessage }] }]
+        })
+      }
+    );
+
+    if (!response.ok) {
+      const text = await response.text();
+      console.error('Gemini API error:', response.status, text);
+      return res.status(502).json({ reply: "Error from Gemini API." });
+    }
+
+    const data = await response.json();
+    const reply = data?.candidates?.[0]?.content?.parts?.[0]?.text || "Sorry, I couldn't get a response.";
+    res.json({ reply });
+  } catch (err) {
+    console.error('Assistant proxy error:', err);
+    res.status(500).json({ reply: 'Error contacting Gemini API.' });
+  }
+});
+
+// New endpoint for multiple file and text upload
+app.post('/api/upload', upload.array('files'), async (req, res) => {
+  const { message, apiKey } = req.body;
+  const files = req.files; // multer populates req.files for multiple files
+
+  const GEMINI_API_KEY = apiKey || process.env.GEMINI_API_KEY;
+  if (!GEMINI_API_KEY) {
+    return res.status(400).json({ reply: 'Gemini API key not provided.' });
+  }
+
+  // Construct the parts array for the Gemini API
+  const parts = [];
+  if (message) {
+    parts.push({ text: message });
+  }
+
+  // Loop through each uploaded file and convert it to Base64
+  if (Array.isArray(files) && files.length > 0) {
+    files.forEach(file => {
+      const filePath = path.join(__dirname, '..', file.path);
+      const fileBuffer = fs.readFileSync(filePath);
+      const base64Data = fileBuffer.toString('base64');
+      parts.push({
+        inlineData: {
+          data: base64Data,
+          mimeType: file.mimetype,
+        },
+      });
+      // Clean up the temporary file after processing
+      fs.unlinkSync(filePath);
+    });
+  }
+
+  if (parts.length === 0) {
+    return res.status(400).json({ reply: 'No content provided.' });
+  }
+
+  try {
+    const response = await fetch(
+      'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=' +
+        GEMINI_API_KEY,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ role: 'user', parts }]
         })
       }
     );

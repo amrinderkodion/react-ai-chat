@@ -15,6 +15,7 @@ import Tooltip from '@mui/material/Tooltip';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import MessageContent from '../components/MessageContent.tsx';
+import AttachFileIcon from '@mui/icons-material/AttachFile';
 
 type Msg = { sender: 'assistant' | 'user'; text: string; t?: number };
 type Session = {
@@ -79,6 +80,8 @@ export default function ManagerChatPage() {
   const [editingKey, setEditingKey] = useState(false);
   const [sessionPanelExpanded, setSessionPanelExpanded] = useState(true);
   const endRef = useRef<HTMLDivElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [files, setFiles] = useState<File[]>([]);
 
   useEffect(() => {
     if (!activeId && sessions.length) setActiveId(sessions[0].id);
@@ -91,6 +94,12 @@ export default function ManagerChatPage() {
     endRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [active?.messages.length, loading]);
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      setFiles(Array.from(e.target.files));
+    }
+  };
+
   const updateActiveMessages = (updater: (m: Msg[]) => Msg[]) => {
     setSessions(prev =>
       prev.map(s => (s.id === active?.id ? { ...s, messages: updater(s.messages) } : s)),
@@ -99,29 +108,39 @@ export default function ManagerChatPage() {
 
   const sendMessage = async () => {
     const text = input.trim();
-    if (!text || !active) return;
+    // Allow sending a message with text OR files
+    if (!text && files.length === 0) return;
+  
     const ts = Date.now();
-    updateActiveMessages(msgs => [...msgs, { sender: 'user', text, t: ts }]);
+  
+    // Display the file names in the chat UI
+    if (files.length > 0) {
+      const fileNames = files.map(f => f.name).join(', ');
+      updateActiveMessages(msgs => [...msgs, { sender: 'user', text: `Files attached: ${fileNames}`, t: ts }]);
+    }
+    if (text) {
+      updateActiveMessages(msgs => [...msgs, { sender: 'user', text, t: ts }]);
+    }
+  
     setInput('');
+    setFiles([]); // Clear the file state after sending
     setLoading(true);
-
+  
     try {
-      const recent = (active?.messages || []).slice(-19);
-      const messagesForContext = [...recent, { sender: 'user', text, t: ts }];
-      const history = messagesForContext
-        .map(m => `${m.sender === 'assistant' ? 'Assistant' : 'User'}: ${m.text}`)
-        .join('\n');
-      const payload = `You are a helpful assistant for a team manager.
-Conversation history (most recent last):
-${history}
-Assistant:`;
-
-      const res = await fetch('/api/assistant', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: payload, apiKey: geminiKey }),
+      const formData = new FormData();
+      formData.append('apiKey', geminiKey);
+      formData.append('message', text);
+      // Loop through the files and append each to the FormData
+      files.forEach(file => {
+        formData.append('files', file);
       });
-
+  
+      // Use the new endpoint for file uploads
+      const res = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
+      });
+  
       const data = await res.json();
       const replyText = data?.reply || "I couldn't get a response.";
       updateActiveMessages(msgs => [...msgs, { sender: 'assistant', text: replyText, t: Date.now() }]);
@@ -464,6 +483,21 @@ Assistant:`;
             </Paper>
 
             <Box sx={{ display: 'flex', gap: 2 }}>
+              {/* Hidden file input */}
+              <input
+                title="Attach Files"
+                placeholder="Attach Files"
+                type="file"
+                ref={fileInputRef}
+                onChange={handleFileChange}
+                style={{ display: 'none' }}
+                multiple // This is the crucial attribute for multiple files
+              />
+              <Tooltip title="Attach Files">
+                <IconButton onClick={() => fileInputRef.current?.click()}>
+                  <AttachFileIcon />
+                </IconButton>
+              </Tooltip>
               <TextField
                 value={input}
                 onChange={e => setInput(e.target.value)}
@@ -476,7 +510,7 @@ Assistant:`;
               />
               <Button
                 onClick={sendMessage}
-                disabled={loading || !input.trim()}
+                disabled={loading || (!input.trim() && files.length === 0)}
                 variant="contained"
                 color="primary"
                 sx={{ px: 3, borderRadius: 2, height: '56px', alignSelf: 'flex-end' }}
