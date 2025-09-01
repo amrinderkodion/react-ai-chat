@@ -106,44 +106,45 @@ export default function ManagerChatPage() {
     );
   };
 
+
   const sendMessage = async () => {
     const text = input.trim();
-    // Allow sending a message with text OR files
+    const active = sessions.find(s => s.id === activeId) || sessions[0];
     if (!text && files.length === 0) return;
-  
+
     const ts = Date.now();
-  
-    // Display the file names in the chat UI
+    
     if (files.length > 0) {
       const fileNames = files.map(f => f.name).join(', ');
       updateActiveMessages(msgs => [...msgs, { sender: 'user', text: `Files attached: ${fileNames}`, t: ts }]);
     }
+    
     if (text) {
       updateActiveMessages(msgs => [...msgs, { sender: 'user', text, t: ts }]);
     }
-  
+    
     setInput('');
-    setFiles([]); // Clear the file state after sending
+    setFiles([]);
     setLoading(true);
-  
+
     try {
       const formData = new FormData();
       formData.append('apiKey', geminiKey);
       formData.append('message', text);
-      // Loop through the files and append each to the FormData
-      const historyLimit = 10; // Adjust this number as needed
+
+      const historyLimit = 10;
       const recentHistory = active.messages.slice(-historyLimit);
       formData.append('history', JSON.stringify(recentHistory));
+
       files.forEach(file => {
         formData.append('files', file);
       });
-  
-      // Use the new endpoint for file uploads
+
       const res = await fetch('/api/upload', {
         method: 'POST',
         body: formData,
       });
-  
+
       const data = await res.json();
       const replyText = data?.reply || "I couldn't get a response.";
       updateActiveMessages(msgs => [...msgs, { sender: 'assistant', text: replyText, t: Date.now() }]);

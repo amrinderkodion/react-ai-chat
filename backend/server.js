@@ -1,12 +1,16 @@
 const express = require('express');
 const path = require('path');
+const fs = require('fs');
 const multer = require('multer');
-const upload = multer({ dest: 'uploads/' });
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-const fs = require('fs');
+const uploadDir = path.join(__dirname, 'uploads');
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir);
+}
+const upload = multer({ dest: uploadDir });
 
 app.use((req, res, next) => {
   console.log(new Date().toISOString(), req.method, req.url);
@@ -26,7 +30,6 @@ app.post('/api/upload', upload.array('files'), async (req, res) => {
   }
 
   const systemPrompt = "You are a helpful assistant for a team manager.";
-  
   const contents = [];
 
   contents.push({ role: 'user', parts: [{ text: systemPrompt }] });
@@ -36,8 +39,9 @@ app.post('/api/upload', upload.array('files'), async (req, res) => {
     try {
       conversationHistory = JSON.parse(history);
       conversationHistory.forEach(msg => {
+        const role = msg.sender === 'assistant' ? 'model' : 'user';
         contents.push({
-          role: msg.sender,
+          role: role,
           parts: [{ text: msg.text }]
         });
       });
@@ -104,11 +108,9 @@ app.post('/api/upload', upload.array('files'), async (req, res) => {
 
 
 app.use(express.static(path.join(__dirname, '..', 'dist')));
-
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, '..', 'dist', 'index.html'));
 });
-
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Server listening on http://0.0.0.0:${PORT} (accessible on local network at http://<YOUR_IP>:${PORT})`);
+  console.log(`Server listening on http://0.0.0.0:${PORT}`);
 });
