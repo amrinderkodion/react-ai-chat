@@ -131,6 +131,9 @@ export default function ManagerChatPage() {
       formData.append('apiKey', geminiKey);
       formData.append('message', text);
       // Loop through the files and append each to the FormData
+      const historyLimit = 10; // Adjust this number as needed
+      const recentHistory = active.messages.slice(-historyLimit);
+      formData.append('history', JSON.stringify(recentHistory));
       files.forEach(file => {
         formData.append('files', file);
       });
