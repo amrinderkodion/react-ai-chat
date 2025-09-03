@@ -106,55 +106,122 @@ export default function ManagerChatPage() {
     );
   };
 
-
   const sendMessage = async () => {
-    const text = input.trim();
-    const active = sessions.find(s => s.id === activeId) || sessions[0];
-    if (!text && files.length === 0) return;
+  const text = input.trim();
+  const active = sessions.find(s => s.id === activeId) || sessions[0];
+  if (!text && files.length === 0) return;
 
-    const ts = Date.now();
-    
-    if (files.length > 0) {
-      const fileNames = files.map(f => f.name).join(', ');
-      updateActiveMessages(msgs => [...msgs, { sender: 'user', text: `Files attached: ${fileNames}`, t: ts }]);
+  const ts = Date.now();
+
+  // Add a placeholder message for the assistant's response
+  const assistantPlaceholder = { sender: 'assistant' as const, text: '' as const, t: Date.now() };
+
+  if (files.length > 0) {
+    const fileNames = files.map(f => f.name).join(', ');
+    updateActiveMessages(msgs => [...msgs, { sender: 'user', text: `Files attached: ${fileNames}`, t: ts }, assistantPlaceholder]);
+  } else {
+    updateActiveMessages(msgs => [...msgs, { sender: 'user', text, t: ts }, assistantPlaceholder]);
+  }
+
+  setInput('');
+  setFiles([]);
+  setLoading(true);
+
+  try {
+    const formData = new FormData();
+    formData.append('apiKey', geminiKey);
+    formData.append('message', text);
+
+    const historyLimit = 10;
+    const recentHistory = active.messages.slice(-historyLimit);
+    formData.append('history', JSON.stringify(recentHistory));
+
+    files.forEach(file => {
+      formData.append('files', file);
+    });
+
+    const res = await fetch('/api/upload', {
+      method: 'POST',
+      body: formData,
+    });
+
+    console.log('Fetch response received:', res.status, res.statusText);
+
+    if (!res.body) {
+      console.error("Response body not available.");
+      throw new Error("Response body not available.");
     }
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let incompleteChunk = '';
+
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) {
+        console.log('Client received complete stream.');
+        setLoading(false);
+        break;
+      }
     
-    if (text) {
-      updateActiveMessages(msgs => [...msgs, { sender: 'user', text, t: ts }]);
+      const chunk = decoder.decode(value);
+      console.log('Client received raw chunk:', chunk);
+      incompleteChunk += chunk;
+    
+      // Process complete event stream messages
+      const eventParts = incompleteChunk.split('\n\n');
+      incompleteChunk = eventParts.pop() || '';
+    
+      for (const part of eventParts) {
+        if (part.startsWith('data:')) {
+          const jsonString = part.substring(5).trim();
+          try {
+            const data = JSON.parse(jsonString);
+            
+            // Check the type of data to handle chunks and the final response
+            if (data.type === 'chunk') {
+              console.log('Client parsed JSON chunk:', data);
+              const chunkText = data.text;
+              if (chunkText) {
+                updateActiveMessages(messages => {
+                  const lastMessage = messages[messages.length - 1];
+                  return [...messages.slice(0, -1), { ...lastMessage, text: lastMessage.text + chunkText }];
+                });
+              }
+            } else if (data.type === 'final') {
+              console.log('Client parsed JSON final:', data);
+              const finalText = data.text;
+              if (finalText) {
+                updateActiveMessages(messages => {
+                  const lastMessage = messages[messages.length - 1];
+                  return [...messages.slice(0, -1), { ...lastMessage, text: finalText }];
+                });
+              }
+            }
+          } catch (e) {
+            console.error('Failed to parse JSON part:', e, 'Part:', jsonString);
+          }
+        }
+      }
     }
-    
-    setInput('');
+  } catch (err) {
+    updateActiveMessages(msgs => {
+      const lastMsg = msgs[msgs.length - 1];
+      if (lastMsg.sender === 'assistant' && lastMsg.text === '') {
+        return msgs.map((m, i) =>
+          i === msgs.length - 1 ?
+            { ...m, text: 'Error contacting assistant.' } :
+            m
+        );
+      }
+      return [...msgs, { sender: 'assistant', text: 'Error contacting assistant.', t: Date.now() }];
+    });
+    console.error(err);
+    setLoading(false);
+  } finally {
     setFiles([]);
-    setLoading(true);
-
-    try {
-      const formData = new FormData();
-      formData.append('apiKey', geminiKey);
-      formData.append('message', text);
-
-      const historyLimit = 10;
-      const recentHistory = active.messages.slice(-historyLimit);
-      formData.append('history', JSON.stringify(recentHistory));
-
-      files.forEach(file => {
-        formData.append('files', file);
-      });
-
-      const res = await fetch('/api/upload', {
-        method: 'POST',
-        body: formData,
-      });
-
-      const data = await res.json();
-      const replyText = data?.reply || "I couldn't get a response.";
-      updateActiveMessages(msgs => [...msgs, { sender: 'assistant', text: replyText, t: Date.now() }]);
-    } catch (err) {
-      updateActiveMessages(msgs => [...msgs, { sender: 'assistant', text: 'Error contacting assistant.', t: Date.now() }]);
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  };
+  }
+};
 
   const createNewSession = () => {
     const s = newSessionTemplate();

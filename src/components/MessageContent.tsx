@@ -32,18 +32,23 @@ const Strong: Components['strong'] = ({ children, ...props }) => (
 );
 
 const UnorderedList: Components['ul'] = ({ children, ...props }) => (
-  <List sx={{ pl: 2, listStyleType: 'disc', mb: 1 }} {...props}>{children}</List>
+  <Box component="ul" sx={{ pl: 3, mb: 1, listStyleType: 'disc' }} {...props}>
+    {children}
+  </Box>
 );
 
 const OrderedList: Components['ol'] = ({ children, ...props }) => (
-  <List sx={{ pl: 2, listStyleType: 'decimal', mb: 1 }} {...props}>{children}</List>
+  <Box component="ol" sx={{ pl: 3, mb: 1, listStyleType: 'decimal' }} {...props}>
+    {children}
+  </Box>
 );
 
 const ListItemContent: Components['li'] = ({ children, ...props }) => (
-  <ListItem sx={{ display: 'list-item', p: 0, '&::marker': { fontSize: '1.2em' } }} {...props}>
+  <Box component="li" sx={{ mb: 0.5 }} {...props}>
     <Typography component="span">{children}</Typography>
-  </ListItem>
+  </Box>
 );
+
 
 const MarkdownLink: Components['a'] = (props) => (
   <Link href={props.href} target="_blank" rel="noopener" {...props} />
