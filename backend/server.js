@@ -4,6 +4,7 @@ const fs = require('fs');
 const multer = require('multer');
 const { initializeVectorStore, augmentMessageWithRagContext } = require('./rag/vector-store.js');
 const ragRoutes = require('./rag/rag-routes.js');
+const cookieParser = require('cookie-parser');
 
 
 const app = express();
@@ -30,6 +31,7 @@ app.use((req, res, next) => {
 
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
+app.use(cookieParser());
 
 
 if (RAG_ENABLED) {
@@ -43,8 +45,26 @@ app.get('/api/config', (req, res) => {
   });
 });
 
+app.post('/api/set-key', (req, res) => {
+  const { apiKey } = req.body;
+
+  if (!apiKey) {
+    return res.status(400).json({ message: 'API key is required.' });
+  }
+
+  res.cookie('gemini_api_key', apiKey, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production', // Use secure in production
+    sameSite: 'strict',
+    maxAge: 3600000 * 24 * 60 // 24 hours
+  });
+
+  res.status(200).json({ message: 'API key successfully set.' });
+});
+
 app.post('/api/upload', upload.array('files'), async (req, res) => {
-  const { message, apiKey, history } = req.body;
+  const apiKey = req.cookies.gemini_api_key; 
+  const { message,  history } = req.body;
   const files = req.files;
 
   const GEMINI_API_KEY = apiKey || process.env.GEMINI_API_KEY;

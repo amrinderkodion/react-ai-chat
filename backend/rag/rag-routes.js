@@ -9,7 +9,8 @@ const router = express.Router();
 const upload = multer({ dest: path.join(__dirname, '..', 'uploads') });
 
 router.post('/upload-knowledge', upload.array('knowledgeFiles'), async (req, res) => {
-  const { apiKey } = req.body;
+  // const { apiKey } = req.body;
+  const apiKey = req.cookies.gemini_api_key; 
   const files = req.files;
 
   if (!apiKey) {

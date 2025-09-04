@@ -31,7 +31,6 @@ type Session = {
 };
 
 const STORAGE_KEY = 'manager_chat_sessions_v1';
-const API_KEY_STORAGE = 'manager_chat_gemini_key_v1';
 
 function loadSessions(): Session[] {
   try {
@@ -80,8 +79,7 @@ export default function ManagerChatPage() {
   const [activeId, setActiveId] = useState<string>(() => sessions[0]?.id || '');
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
-  const [geminiKey, setGeminiKey] = useState<string>(() => localStorage.getItem(API_KEY_STORAGE) || '');
-  const [editingKey, setEditingKey] = useState(false);
+  const [apiKeyInput, setApiKeyInput] = useState('');
   const [sessionPanelExpanded, setSessionPanelExpanded] = useState(true);
   const endRef = useRef<HTMLDivElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -118,9 +116,7 @@ export default function ManagerChatPage() {
     const newFiles: File[] = [];
     const items = event.clipboardData.items;
     
-    // Iterate through all clipboard items
     for (const item of items) {
-      // Check if the item is a file
       if (item.kind === 'file') {
         const file = item.getAsFile();
         if (file) {
@@ -129,10 +125,8 @@ export default function ManagerChatPage() {
       }
     }
 
-    // Add new files to the state if any were found
     if (newFiles.length > 0) {
       setFiles((prevFiles) => [...prevFiles, ...newFiles]);
-      // Prevent the default paste behavior to avoid pasting the file name into the text area.
       event.preventDefault(); 
     }
   };
@@ -141,16 +135,49 @@ export default function ManagerChatPage() {
     setFiles((prevFiles) => prevFiles.filter((file) => file !== fileToRemove));
   };
 
-  const handleKnowledgeUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = event.target.files;
-    if (!files || files.length === 0) return;
-    if (!geminiKey) {
-      setNotification({ open: true, message: 'Please set your Gemini API key first.' });
+
+  const handleSetApiKey = async () => {
+    if (!apiKeyInput) {
       return;
     }
 
+    try {
+      const response = await fetch('/api/set-key', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ apiKey: apiKeyInput }),
+      });
+
+      if (response.ok) {
+        setNotification({
+          open: true,
+          message: 'API key successfully saved. Your session is now active.',
+        });
+        setApiKeyInput('');
+      } else {
+        const errorData = await response.json();
+        setNotification({
+          open: true,
+          message: `Failed to set API key: ${errorData.message}`,
+        });
+      }
+    } catch (error) {
+      console.error('Error setting API key:', error);
+      setNotification({
+        open: true,
+        message: 'Network error. Could not set API key.',
+      });
+    }
+  };
+
+  const handleKnowledgeUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+    
+
     const formData = new FormData();
-    formData.append('apiKey', geminiKey);
     Array.from(files).forEach(file => {
       formData.append('knowledgeFiles', file);
     });
@@ -220,7 +247,6 @@ export default function ManagerChatPage() {
 
     try {
       const formData = new FormData();
-      formData.append('apiKey', geminiKey);
       formData.append('message', text);
 
       const historyLimit = 10;
@@ -515,29 +541,23 @@ export default function ManagerChatPage() {
                         />
                       </Box>
                       <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 1 }}>
-                        {editingKey ? (
-                          <Box sx={{ display: 'flex', gap: 1 }}>
-                            <TextField
-                              size="small"
-                              placeholder="Gemini API key"
-                              value={geminiKey}
-                              onChange={e => setGeminiKey(e.target.value)}
-                            />
-                            <Button
-                              variant="contained"
-                              onClick={() => { localStorage.setItem(API_KEY_STORAGE, geminiKey); setEditingKey(false); }}
-                            >
-                              Save
-                            </Button>
-                          </Box>
-                        ) : (
-                          <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
-                            <Typography variant="caption" color="text.secondary">
-                              Key: {geminiKey ? '••••••••' : 'not set'}
-                            </Typography>
-                            <Button size="small" onClick={() => setEditingKey(true)}>Edit</Button>
-                          </Box>
-                        )}
+                        <Box sx={{ display: 'flex', gap: 1 }}>
+                          <TextField
+                            label="Enter your Gemini API Key"
+                            value={apiKeyInput}
+                            onChange={(e) => setApiKeyInput(e.target.value)}
+                            variant="outlined"
+                            size="small"
+                            sx={{ flex: 1 }}
+                          />
+                          <Button
+                            onClick={handleSetApiKey}
+                            variant="contained"
+                            color="primary"
+                          >
+                            Save
+                          </Button>
+                        </Box>
                       </Box>
                       <Box sx={{ alignSelf: 'flex-start' }}>
                         <Typography variant="body2" sx={{ fontWeight: 600 }} mb={1}>Session info</Typography>
