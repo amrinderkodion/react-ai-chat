@@ -12,10 +12,14 @@ import FileDownloadIcon from '@mui/icons-material/FileDownload';
 import AddIcon from '@mui/icons-material/Add';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import Tooltip from '@mui/material/Tooltip';
+import Chip from '@mui/material/Chip';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import MessageContent from '../components/MessageContent.tsx';
 import AttachFileIcon from '@mui/icons-material/AttachFile';
+import CloudUploadIcon from '@mui/icons-material/CloudUpload'; // Import new icon
+import Snackbar from '@mui/material/Snackbar'; // For notifications
+import CloseIcon from '@mui/icons-material/Close';
 
 type Msg = { sender: 'assistant' | 'user'; text: string; t?: number };
 type Session = {
@@ -82,6 +86,9 @@ export default function ManagerChatPage() {
   const endRef = useRef<HTMLDivElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [files, setFiles] = useState<File[]>([]);
+  const [isRagEnabled, setIsRagEnabled] = useState(false);
+  const knowledgeFileInputRef = useRef<HTMLInputElement>(null);
+  const [notification, setNotification] = useState({ open: false, message: '' });
 
   useEffect(() => {
     if (!activeId && sessions.length) setActiveId(sessions[0].id);
@@ -93,6 +100,90 @@ export default function ManagerChatPage() {
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [active?.messages.length, loading]);
+
+  useEffect(() => {
+    const fetchConfig = async () => {
+      try {
+        const response = await fetch('/api/config');
+        const config = await response.json();
+        setIsRagEnabled(config.isRagEnabled);
+      } catch (error) {
+        console.error("Could not fetch server configuration:", error);
+      }
+    };
+    fetchConfig();
+  }, []);
+
+  const handlePaste = (event: React.ClipboardEvent<HTMLInputElement>) => {
+    const newFiles: File[] = [];
+    const items = event.clipboardData.items;
+    
+    // Iterate through all clipboard items
+    for (const item of items) {
+      // Check if the item is a file
+      if (item.kind === 'file') {
+        const file = item.getAsFile();
+        if (file) {
+          newFiles.push(file);
+        }
+      }
+    }
+
+    // Add new files to the state if any were found
+    if (newFiles.length > 0) {
+      setFiles((prevFiles) => [...prevFiles, ...newFiles]);
+      // Prevent the default paste behavior to avoid pasting the file name into the text area.
+      event.preventDefault(); 
+    }
+  };
+
+  const handleRemoveFile = (fileToRemove: File) => {
+    setFiles((prevFiles) => prevFiles.filter((file) => file !== fileToRemove));
+  };
+
+  const handleKnowledgeUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+    if (!geminiKey) {
+      setNotification({ open: true, message: 'Please set your Gemini API key first.' });
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append('apiKey', geminiKey);
+    Array.from(files).forEach(file => {
+      formData.append('knowledgeFiles', file);
+    });
+
+    try {
+      setLoading(true);
+      setNotification({ open: true, message: 'Indexing knowledge documents...' });
+
+      const response = await fetch('/api/rag/upload-knowledge', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result.message || 'Failed to upload.');
+      }
+      
+      setNotification({ open: true, message: result.message });
+    } catch (error) {
+      console.error('Knowledge upload error:', error);
+      if (error instanceof Error) {
+        const knowmessage = error.message;
+        setNotification({ open: true, message: `Error: ${knowmessage}` });
+      }
+    } finally {
+      setLoading(false);
+      // Reset the file input so the same file can be re-uploaded
+      if (knowledgeFileInputRef.current) {
+        knowledgeFileInputRef.current.value = '';
+      }
+    }
+  };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
@@ -107,121 +198,121 @@ export default function ManagerChatPage() {
   };
 
   const sendMessage = async () => {
-  const text = input.trim();
-  const active = sessions.find(s => s.id === activeId) || sessions[0];
-  if (!text && files.length === 0) return;
+    const text = input.trim();
+    const active = sessions.find(s => s.id === activeId) || sessions[0];
+    if (!text && files.length === 0) return;
 
-  const ts = Date.now();
+    const ts = Date.now();
 
-  // Add a placeholder message for the assistant's response
-  const assistantPlaceholder = { sender: 'assistant' as const, text: '' as const, t: Date.now() };
+    // Add a placeholder message for the assistant's response
+    const assistantPlaceholder = { sender: 'assistant' as const, text: '' as const, t: Date.now() };
 
-  if (files.length > 0) {
-    const fileNames = files.map(f => f.name).join(', ');
-    updateActiveMessages(msgs => [...msgs, { sender: 'user', text: `Files attached: ${fileNames}`, t: ts }, assistantPlaceholder]);
-  } else {
-    updateActiveMessages(msgs => [...msgs, { sender: 'user', text, t: ts }, assistantPlaceholder]);
-  }
-
-  setInput('');
-  setFiles([]);
-  setLoading(true);
-
-  try {
-    const formData = new FormData();
-    formData.append('apiKey', geminiKey);
-    formData.append('message', text);
-
-    const historyLimit = 10;
-    const recentHistory = active.messages.slice(-historyLimit);
-    formData.append('history', JSON.stringify(recentHistory));
-
-    files.forEach(file => {
-      formData.append('files', file);
-    });
-
-    const res = await fetch('/api/upload', {
-      method: 'POST',
-      body: formData,
-    });
-
-    console.log('Fetch response received:', res.status, res.statusText);
-
-    if (!res.body) {
-      console.error("Response body not available.");
-      throw new Error("Response body not available.");
+    if (files.length > 0) {
+      const fileNames = files.map(f => f.name).join(', ');
+      updateActiveMessages(msgs => [...msgs, { sender: 'user', text: `Files attached: ${fileNames}`, t: ts }, assistantPlaceholder]);
+    } else {
+      updateActiveMessages(msgs => [...msgs, { sender: 'user', text, t: ts }, assistantPlaceholder]);
     }
 
-    const reader = res.body.getReader();
-    const decoder = new TextDecoder();
-    let incompleteChunk = '';
+    setInput('');
+    setFiles([]);
+    setLoading(true);
 
-    while (true) {
-      const { value, done } = await reader.read();
-      if (done) {
-        console.log('Client received complete stream.');
-        setLoading(false);
-        break;
+    try {
+      const formData = new FormData();
+      formData.append('apiKey', geminiKey);
+      formData.append('message', text);
+
+      const historyLimit = 10;
+      const recentHistory = active.messages.slice(-historyLimit);
+      formData.append('history', JSON.stringify(recentHistory));
+
+      files.forEach(file => {
+        formData.append('files', file);
+      });
+
+      const res = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      console.log('Fetch response received:', res.status, res.statusText);
+
+      if (!res.body) {
+        console.error("Response body not available.");
+        throw new Error("Response body not available.");
       }
-    
-      const chunk = decoder.decode(value);
-      console.log('Client received raw chunk:', chunk);
-      incompleteChunk += chunk;
-    
-      // Process complete event stream messages
-      const eventParts = incompleteChunk.split('\n\n');
-      incompleteChunk = eventParts.pop() || '';
-    
-      for (const part of eventParts) {
-        if (part.startsWith('data:')) {
-          const jsonString = part.substring(5).trim();
-          try {
-            const data = JSON.parse(jsonString);
-            
-            // Check the type of data to handle chunks and the final response
-            if (data.type === 'chunk') {
-              console.log('Client parsed JSON chunk:', data);
-              const chunkText = data.text;
-              if (chunkText) {
-                updateActiveMessages(messages => {
-                  const lastMessage = messages[messages.length - 1];
-                  return [...messages.slice(0, -1), { ...lastMessage, text: lastMessage.text + chunkText }];
-                });
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let incompleteChunk = '';
+
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) {
+          console.log('Client received complete stream.');
+          setLoading(false);
+          break;
+        }
+      
+        const chunk = decoder.decode(value);
+        console.log('Client received raw chunk:', chunk);
+        incompleteChunk += chunk;
+      
+        // Process complete event stream messages
+        const eventParts = incompleteChunk.split('\n\n');
+        incompleteChunk = eventParts.pop() || '';
+      
+        for (const part of eventParts) {
+          if (part.startsWith('data:')) {
+            const jsonString = part.substring(5).trim();
+            try {
+              const data = JSON.parse(jsonString);
+              
+              // Check the type of data to handle chunks and the final response
+              if (data.type === 'chunk') {
+                console.log('Client parsed JSON chunk:', data);
+                const chunkText = data.text;
+                if (chunkText) {
+                  updateActiveMessages(messages => {
+                    const lastMessage = messages[messages.length - 1];
+                    return [...messages.slice(0, -1), { ...lastMessage, text: lastMessage.text + chunkText }];
+                  });
+                }
+              } else if (data.type === 'final') {
+                console.log('Client parsed JSON final:', data);
+                const finalText = data.text;
+                if (finalText) {
+                  updateActiveMessages(messages => {
+                    const lastMessage = messages[messages.length - 1];
+                    return [...messages.slice(0, -1), { ...lastMessage, text: finalText }];
+                  });
+                }
               }
-            } else if (data.type === 'final') {
-              console.log('Client parsed JSON final:', data);
-              const finalText = data.text;
-              if (finalText) {
-                updateActiveMessages(messages => {
-                  const lastMessage = messages[messages.length - 1];
-                  return [...messages.slice(0, -1), { ...lastMessage, text: finalText }];
-                });
-              }
+            } catch (e) {
+              console.error('Failed to parse JSON part:', e, 'Part:', jsonString);
             }
-          } catch (e) {
-            console.error('Failed to parse JSON part:', e, 'Part:', jsonString);
           }
         }
       }
+    } catch (err) {
+      updateActiveMessages(msgs => {
+        const lastMsg = msgs[msgs.length - 1];
+        if (lastMsg.sender === 'assistant' && lastMsg.text === '') {
+          return msgs.map((m, i) =>
+            i === msgs.length - 1 ?
+              { ...m, text: 'Error contacting assistant.' } :
+              m
+          );
+        }
+        return [...msgs, { sender: 'assistant', text: 'Error contacting assistant.', t: Date.now() }];
+      });
+      console.error(err);
+      setLoading(false);
+    } finally {
+      setFiles([]);
     }
-  } catch (err) {
-    updateActiveMessages(msgs => {
-      const lastMsg = msgs[msgs.length - 1];
-      if (lastMsg.sender === 'assistant' && lastMsg.text === '') {
-        return msgs.map((m, i) =>
-          i === msgs.length - 1 ?
-            { ...m, text: 'Error contacting assistant.' } :
-            m
-        );
-      }
-      return [...msgs, { sender: 'assistant', text: 'Error contacting assistant.', t: Date.now() }];
-    });
-    console.error(err);
-    setLoading(false);
-  } finally {
-    setFiles([]);
-  }
-};
+  };
 
   const createNewSession = () => {
     const s = newSessionTemplate();
@@ -258,10 +349,10 @@ export default function ManagerChatPage() {
   };
 
   return (
-    <Box sx={{ display: 'flex', gap: 2, p: 2, height: '100vh', width: '100%' }}>
+    <Box sx={{ display: 'flex', gap: 1, p: 1, height: '100vh', width: '100%' }}>
       {/* Session List */}
-      <Paper elevation={3} sx={{ width: 300, p: 2, borderRadius: 3, height: '100%', overflowY: 'auto', bgcolor: '#f5f5f7' }}>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+      <Paper elevation={3} sx={{ width: 300, p: 1, borderRadius: 3, height: '100%', overflowY: 'auto', bgcolor: '#f5f5f7' }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
           <Typography variant="h6" fontWeight={700}>Sessions</Typography>
           <Box>
             <Tooltip title="New Session">
@@ -294,7 +385,7 @@ export default function ManagerChatPage() {
               elevation={s.id === activeId ? 6 : 1}
               sx={{
                 p: 1.5,
-                mb: 2,
+                mb: 1,
                 borderRadius: 2,
                 cursor: 'pointer',
                 bgcolor: s.id === activeId ? '#e3f2fd' : '#fff',
@@ -376,18 +467,43 @@ export default function ManagerChatPage() {
       <Box sx={{ flex: 1, width: 0, display: 'flex', flexDirection: 'column', height: '100%' }}>
         {active ? (
           <>
-            <Box sx={{ display: 'flex', gap: 2, mb: 2, justifyContent: 'flex-end', alignItems: 'center' }}>
-              <Paper sx={{ width: '100%', p: 2, borderRadius: 2, bgcolor: '#fafafa', position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'stretch' }}>
+            <Box sx={{ display: 'flex', gap: 1, mb: 1, justifyContent: 'flex-end', alignItems: 'center' }}>
+              <Paper sx={{ width: '100%', p: 1, borderRadius: 2, bgcolor: '#fafafa', position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'stretch' }}>
                 
                 {sessionPanelExpanded ? (
-                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, width: '100%' }}>
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, width: '100%' }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
                       <Typography variant="body2" sx={{ fontWeight: 600 }}>Session Details</Typography>
                       <IconButton size="small" onClick={() => setSessionPanelExpanded(e => !e)}>
                         {sessionPanelExpanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
                       </IconButton>
                     </Box>
-                    <Box sx={{ display: 'flex', flexDirection: 'row', gap: 2, width: '100%' }}>
+                    <Box sx={{ display: 'flex', flexDirection: 'row', gap: 1, width: '100%' }}>
+                      {isRagEnabled && (
+                        <Box sx={{ alignSelf: 'flex-start', ml: 1, borderLeft: '1px solid #ddd', pl: 1 }}>
+                          <Typography variant="body2" sx={{ fontWeight: 600 }} mb={1}>Knowledge Base</Typography>
+                          <Typography variant="caption" display="block" color="text.secondary" mb={1}>
+                            Upload TXT or MD files for the AI to use as context.
+                          </Typography>
+                          <input
+                            type="file"
+                            ref={knowledgeFileInputRef}
+                            onChange={handleKnowledgeUpload}
+                            style={{ display: 'none' }}
+                            multiple
+                            accept=".txt,.md"
+                          />
+                          <Button
+                            variant="outlined"
+                            size="small"
+                            startIcon={<CloudUploadIcon />}
+                            onClick={() => knowledgeFileInputRef.current?.click()}
+                            disabled={loading}
+                          >
+                            Upload Docs
+                          </Button>
+                        </Box>
+                      )}
                       <Box sx={{ flex: 1 }}>
                         <TextField
                           label="Session Notes"
@@ -488,7 +604,7 @@ export default function ManagerChatPage() {
                         overflow: 'hidden',
                         textOverflow: 'ellipsis',
                         minWidth: 0,
-                        ml: 2,
+                        ml: 1,
                         marginTop: 1
                       }}
                     >
@@ -517,9 +633,9 @@ export default function ManagerChatPage() {
               </Paper>
             </Box>
 
-            <Paper sx={{ flex: 1, overflowY: 'auto', p: 2, borderRadius: 2, mb: 2, bgcolor: '#f5f5f7', width: '100%', maxWidth: '100%' }}>
+            <Paper sx={{ flex: 1, overflowY: 'auto', p: 1, borderRadius: 2, mb: 1, bgcolor: '#f5f5f7', width: '100%', maxWidth: '100%' }}>
               {active.messages.map((m, i) => (
-                <Box key={i} sx={{ display: 'flex', justifyContent: m.sender === 'assistant' ? 'flex-start' : 'flex-end', mb: 2 }}>
+                <Box key={i} sx={{ display: 'flex', justifyContent: m.sender === 'assistant' ? 'flex-start' : 'flex-end', mb: 1 }}>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                     {m.sender === 'assistant' && (
                       <Avatar sx={{ width: 28, height: 28, bgcolor: '#1976d2', fontSize: 16 }}>AI</Avatar>
@@ -527,7 +643,7 @@ export default function ManagerChatPage() {
                     <Box
                       sx={{
                         bgcolor: m.sender === 'assistant' ? '#e3f2fd' : '#d1e7dd',
-                        px: 2,
+                        px: 1,
                         py: 1,
                         borderRadius: 2,
                         maxWidth: 700,
@@ -553,7 +669,31 @@ export default function ManagerChatPage() {
               <div ref={endRef} />
             </Paper>
 
-            <Box sx={{ display: 'flex', gap: 2 }}>
+            {files.length > 0 && (
+              <Box sx={{ 
+                bgcolor: 'background.paper', 
+                p: 1, 
+                mb: 1,
+                borderRadius: 1, 
+                boxShadow: 1, 
+                display: 'flex',
+                flexWrap: 'wrap',
+                gap: 1,
+              }}
+              >
+                {files.map((file, index) => (
+                  <Chip
+                    key={index}
+                    label={file.name}
+                    onDelete={() => handleRemoveFile(file)}
+                    deleteIcon={<CloseIcon />}
+                    variant="outlined"
+                  />
+                ))}
+              </Box>
+            )}
+
+            <Box sx={{ display: 'flex', gap: 1 }}>
               {/* Hidden file input */}
               <input
                 title="Attach Files"
@@ -571,6 +711,7 @@ export default function ManagerChatPage() {
               </Tooltip>
               <TextField
                 value={input}
+                onPaste={handlePaste} 
                 onChange={e => setInput(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
                 placeholder="Describe a scenario or ask for a tip..."
@@ -594,6 +735,12 @@ export default function ManagerChatPage() {
           <Typography variant="body1" color="text.secondary">No active session</Typography>
         )}
       </Box>
+      <Snackbar
+        open={notification.open}
+        autoHideDuration={6000}
+        onClose={() => setNotification({ ...notification, open: false })}
+        message={notification.message}
+      />
     </Box>
   );
 }

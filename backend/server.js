@@ -2,9 +2,20 @@ const express = require('express');
 const path = require('path');
 const fs = require('fs');
 const multer = require('multer');
+const { initializeVectorStore, augmentMessageWithRagContext } = require('./rag/vector-store.js');
+const ragRoutes = require('./rag/rag-routes.js');
+
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+
+const RAG_ENABLED = 'true'; // process.env.RAG_ENABLED === 'true';
+console.log(`RAG feature is ${RAG_ENABLED ? 'ENABLED' : 'DISABLED'}.`);
+if (RAG_ENABLED) {
+  initializeVectorStore();
+}
+
 
 const uploadDir = path.join(__dirname, 'uploads');
 if (!fs.existsSync(uploadDir)) {
@@ -20,99 +31,17 @@ app.use((req, res, next) => {
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 
-/* function createChunkParser() {
-  let incompleteChunk = '';
 
-  return function(chunk) {
-    let output = null;
-    const combinedChunk = incompleteChunk + chunk;
-
-    // This regex looks for complete JSON objects or arrays.
-    const jsonRegex = /{[^{}]*?}|\[[^[\]]*?\]/g;
-    let match;
-    let lastIndex = 0;
-
-    // Process all valid JSON objects in the combined chunk
-    while ((match = jsonRegex.exec(combinedChunk)) !== null) {
-      const jsonPart = match[0].trim();
-      try {
-        const data = JSON.parse(jsonPart);
-        const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
-        if (text) {
-          // Accumulate all text found in this processing step
-          output = output ? output + text : text;
-        }
-      } catch (e) {
-        console.error('Parser Log: Failed to parse stream chunk:', e, 'Chunk:', jsonPart);
-      }
-      lastIndex = jsonRegex.lastIndex;
-    }
-
-    // Save any remaining incomplete text for the next chunk
-    incompleteChunk = combinedChunk.slice(lastIndex);
-    return output;
-  };
-} */
-
- function createChunkParser() {
-  let incompleteChunk = '';
-
-  return function(chunk) {
-    const combinedChunk = incompleteChunk + chunk;
-    let output = null;
-    // Trim leading characters [ or , to handle fragmented JSON streams
-    let trimmedText = combinedChunk.trim();
-    if (trimmedText.startsWith('[')) {
-      trimmedText = trimmedText.substring(1);
-    } else if (trimmedText.startsWith(',')) {
-      trimmedText = trimmedText.substring(1);
-    }
-    
-    try {
-      // Attempt to parse the cleaned text as a JSON array
-      const data = JSON.parse(`[${trimmedText}]`);
-      const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
-      if (text) {
-        // Accumulate all text found in this processing step
-        output = output ? output + text : text;
-      }
-      incompleteChunk = ''; // Success: clear the saved chunk
-      console.log('Parser Log: Successfully parsed current accumulated JSON! Clearing incomplete chunk.');
-    } catch (e) {
-      console.error('Parser Log: Failed to parse. Saving chunk for next iteration:'+chunk);
-      incompleteChunk = combinedChunk; // Failure: save the combined chunk
-      return false;
-    }
-    return output;
-  };
-} 
-
-async function* processGeminiStream(reader) {
-  const decoder = new TextDecoder();
-  const parseChunk = createChunkParser();
-  let fullResponse = '';
-
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    const rawChunk = decoder.decode(value, { stream: true });
-    fullResponse += rawChunk;
-
-    const parsedText = parseChunk(rawChunk);
-    if (parsedText) {
-      // Yield the parsed text as a chunk for the client
-      yield { type: 'chunk', text: parsedText };
-    }
-  }
-  try {
-    const jsonArray = JSON.parse(fullResponse);
-    const final_text = jsonArray.map(data => data?.candidates?.[0]?.content?.parts?.[0]?.text || '').join('');
-    // Yield the final, full response for the client to replace the incremental text
-    yield { type: 'final', text: final_text };
-  } catch (e) {
-    console.error('Parser Log: Failed to parse final response:', e);
-  }
+if (RAG_ENABLED) {
+  app.use('/api/rag', ragRoutes);
+  console.log('RAG API routes are active.');
 }
+
+app.get('/api/config', (req, res) => {
+  res.json({
+    isRagEnabled: RAG_ENABLED,
+  });
+});
 
 app.post('/api/upload', upload.array('files'), async (req, res) => {
   const { message, apiKey, history } = req.body;
@@ -121,6 +50,11 @@ app.post('/api/upload', upload.array('files'), async (req, res) => {
   const GEMINI_API_KEY = apiKey || process.env.GEMINI_API_KEY;
   if (!GEMINI_API_KEY) {
     return res.status(400).json({ reply: 'Gemini API key not provided.' });
+  }
+
+  let augmentedMessage = message;
+  if (RAG_ENABLED && message) {
+    augmentedMessage = await augmentMessageWithRagContext(message, GEMINI_API_KEY);
   }
 
   const systemPrompt = "You are a helpful assistant for a team manager.";
@@ -144,10 +78,11 @@ app.post('/api/upload', upload.array('files'), async (req, res) => {
     }
   }
 
-  const currentParts = [];
+  /* const currentParts = [];
   if (message) {
     currentParts.push({ text: message });
-  }
+  } */
+ const currentParts = [{ text: augmentedMessage }];
 
   if (Array.isArray(files) && files.length > 0) {
     files.forEach(file => {
@@ -168,7 +103,8 @@ app.post('/api/upload', upload.array('files'), async (req, res) => {
       role: 'user',
       parts: currentParts
     });
-  }
+  } 
+ 
 
   if (contents.length === 0) {
     return res.status(400).json({ reply: 'No content provided.' });
@@ -208,7 +144,6 @@ app.post('/api/upload', upload.array('files'), async (req, res) => {
       const rawChunk = decoder.decode(value, { stream: true });
       full += rawChunk;
 
-      // Look for "text": "..." inside the chunk
       const matches = [...rawChunk.matchAll(/"text"\s*:\s*"([^"]*)"/g)];
       for (const match of matches) {
         const text = match[1];
