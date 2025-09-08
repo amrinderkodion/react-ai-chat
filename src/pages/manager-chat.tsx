@@ -20,6 +20,8 @@ import AttachFileIcon from '@mui/icons-material/AttachFile';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload'; // Import new icon
 import Snackbar from '@mui/material/Snackbar'; // For notifications
 import CloseIcon from '@mui/icons-material/Close';
+import { processAndSaveKnowledge, searchLocalKnowledge,hasLocalKnowledgeBase } from '../client-rag.ts'
+import SettingsIcon from '@mui/icons-material/Settings';
 
 type Msg = { sender: 'assistant' | 'user'; text: string; t?: number };
 type Session = {
@@ -87,6 +89,8 @@ export default function ManagerChatPage() {
   const [isRagEnabled, setIsRagEnabled] = useState(false);
   const knowledgeFileInputRef = useRef<HTMLInputElement>(null);
   const [notification, setNotification] = useState({ open: false, message: '' });
+  const [ragMode, setRagMode] = useState<'server' | 'client'>('server');
+  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
 
   useEffect(() => {
     if (!activeId && sessions.length) setActiveId(sessions[0].id);
@@ -173,42 +177,48 @@ export default function ManagerChatPage() {
   };
 
   const handleKnowledgeUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = event.target.files;
-    if (!files || files.length === 0) return;
-    
+    if(ragMode == 'server'){
+      const files = event.target.files;
+      if (!files || files.length === 0) return;
+      
 
-    const formData = new FormData();
-    Array.from(files).forEach(file => {
-      formData.append('knowledgeFiles', file);
-    });
-
-    try {
-      setLoading(true);
-      setNotification({ open: true, message: 'Indexing knowledge documents...' });
-
-      const response = await fetch('/api/rag/upload-knowledge', {
-        method: 'POST',
-        body: formData,
+      const formData = new FormData();
+      Array.from(files).forEach(file => {
+        formData.append('knowledgeFiles', file);
       });
 
-      const result = await response.json();
-      if (!response.ok) {
-        throw new Error(result.message || 'Failed to upload.');
+      try {
+        setLoading(true);
+        setNotification({ open: true, message: 'Indexing knowledge documents...' });
+
+        const response = await fetch('/api/rag/upload-knowledge', {
+          method: 'POST',
+          body: formData,
+        });
+
+        const result = await response.json();
+        if (!response.ok) {
+          throw new Error(result.message || 'Failed to upload.');
+        }
+        
+        setNotification({ open: true, message: result.message });
+      } catch (error) {
+        console.error('Knowledge upload error:', error);
+        if (error instanceof Error) {
+          const knowmessage = error.message;
+          setNotification({ open: true, message: `Error: ${knowmessage}` });
+        }
+      } finally {
+        setLoading(false);
+        // Reset the file input so the same file can be re-uploaded
+        if (knowledgeFileInputRef.current) {
+          knowledgeFileInputRef.current.value = '';
+        }
       }
-      
-      setNotification({ open: true, message: result.message });
-    } catch (error) {
-      console.error('Knowledge upload error:', error);
-      if (error instanceof Error) {
-        const knowmessage = error.message;
-        setNotification({ open: true, message: `Error: ${knowmessage}` });
-      }
-    } finally {
-      setLoading(false);
-      // Reset the file input so the same file can be re-uploaded
-      if (knowledgeFileInputRef.current) {
-        knowledgeFileInputRef.current.value = '';
-      }
+    } else {
+      const files = event.target.files;
+      if (!files || files.length === 0) return;
+      await processAndSaveKnowledge(Array.from(files));
     }
   };
 
@@ -225,9 +235,23 @@ export default function ManagerChatPage() {
   };
 
   const sendMessage = async () => {
-    const text = input.trim();
+    
+    let text = input.trim();
+    let finalMessage = text;
+    if (ragMode === 'client' && await hasLocalKnowledgeBase()) {
+      const context = await searchLocalKnowledge(input);
+      text = `
+        Based on the following context, please answer the user's question. If the context does not contain the answer, state that you cannot find the information in the provided documents.
+
+        ## Context:
+        ${context}
+
+        ## User's Question:
+        ${finalMessage}
+      `;
+    }
     const active = sessions.find(s => s.id === activeId) || sessions[0];
-    if (!text && files.length === 0) return;
+    if (!finalMessage && files.length === 0) return;
 
     const ts = Date.now();
 
@@ -237,8 +261,9 @@ export default function ManagerChatPage() {
     if (files.length > 0) {
       const fileNames = files.map(f => f.name).join(', ');
       updateActiveMessages(msgs => [...msgs, { sender: 'user', text: `Files attached: ${fileNames}`, t: ts }, assistantPlaceholder]);
-    } else {
-      updateActiveMessages(msgs => [...msgs, { sender: 'user', text, t: ts }, assistantPlaceholder]);
+    } 
+    if(finalMessage){
+      updateActiveMessages(msgs => [...msgs, { sender: 'user', text: finalMessage, t: ts }, assistantPlaceholder]);
     }
 
     setInput('');
@@ -248,6 +273,7 @@ export default function ManagerChatPage() {
     try {
       const formData = new FormData();
       formData.append('message', text);
+      formData.append('ragMode', ragMode);
 
       const historyLimit = 10;
       const recentHistory = active.messages.slice(-historyLimit);
@@ -500,6 +526,26 @@ export default function ManagerChatPage() {
                   <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, width: '100%' }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
                       <Typography variant="body2" sx={{ fontWeight: 600 }}>Session Details</Typography>
+                      &emsp;
+                      <Box sx={{ display: 'flex', flex:1, flexDirection: 'column', alignItems: 'flex-start', gap: 1 }}>
+                        <Box sx={{ display: 'flex', gap: 1 }}>
+                          <TextField
+                            label="Enter your Gemini API Key"
+                            value={apiKeyInput}
+                            onChange={(e) => setApiKeyInput(e.target.value)}
+                            variant="outlined"
+                            size="small"
+                            sx={{ flex: 1 }}
+                          />
+                          <Button
+                            onClick={handleSetApiKey}
+                            variant="contained"
+                            color="primary"
+                          >
+                            Save
+                          </Button>
+                        </Box>
+                      </Box>
                       <IconButton size="small" onClick={() => setSessionPanelExpanded(e => !e)}>
                         {sessionPanelExpanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
                       </IconButton>
@@ -509,7 +555,7 @@ export default function ManagerChatPage() {
                         <Box sx={{ alignSelf: 'flex-start', ml: 1, borderLeft: '1px solid #ddd', pl: 1 }}>
                           <Typography variant="body2" sx={{ fontWeight: 600 }} mb={1}>Knowledge Base</Typography>
                           <Typography variant="caption" display="block" color="text.secondary" mb={1}>
-                            Upload TXT or MD files for the AI to use as context.
+                            Upload TXT or MD files <br/>for the AI to use as context.
                           </Typography>
                           <input
                             type="file"
@@ -530,6 +576,21 @@ export default function ManagerChatPage() {
                           </Button>
                         </Box>
                       )}
+                      <Box sx={{ p: 2, display: 'flex', flexDirection:'column', alignItems: 'left', gap: 2 }}>
+                        <Typography variant="body2">RAG Mode:</Typography>
+                        <Button
+                          variant={ragMode === 'server' ? 'contained' : 'outlined'}
+                          onClick={() => setRagMode('server')}
+                        >
+                          Server-Side
+                        </Button>
+                        <Button
+                          variant={ragMode === 'client' ? 'contained' : 'outlined'}
+                          onClick={() => setRagMode('client')}
+                        >
+                          Client-Side
+                        </Button>
+                      </Box>
                       <Box sx={{ flex: 1 }}>
                         <TextField
                           label="Session Notes"
@@ -539,25 +600,6 @@ export default function ManagerChatPage() {
                           onChange={e => updateSessionNotes(active.id, e.target.value)}
                           sx={{ bgcolor: '#fff', width: '100%' }}
                         />
-                      </Box>
-                      <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 1 }}>
-                        <Box sx={{ display: 'flex', gap: 1 }}>
-                          <TextField
-                            label="Enter your Gemini API Key"
-                            value={apiKeyInput}
-                            onChange={(e) => setApiKeyInput(e.target.value)}
-                            variant="outlined"
-                            size="small"
-                            sx={{ flex: 1 }}
-                          />
-                          <Button
-                            onClick={handleSetApiKey}
-                            variant="contained"
-                            color="primary"
-                          >
-                            Save
-                          </Button>
-                        </Box>
                       </Box>
                       <Box sx={{ alignSelf: 'flex-start' }}>
                         <Typography variant="body2" sx={{ fontWeight: 600 }} mb={1}>Session info</Typography>
@@ -596,23 +638,27 @@ export default function ManagerChatPage() {
                   </Box>
                 ) : (
                   <Box sx={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <Typography
-                      variant="body2"
-                      sx={{
-                        textAlign: 'left',
-                        fontSize: 14,
-                        mb: 1,
-                        display: 'block',
-                        whiteSpace: 'nowrap',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        flex: 1,
-                        marginTop: 1,
-                        fontWeight: 600
-                      }}
-                    >
-                      Session Details
-                    </Typography>
+                    <Typography variant="body2" sx={{ fontWeight: 600 }}>Session Details</Typography>
+                    &emsp;
+                    <Box sx={{ display: 'flex', flex:1, flexDirection: 'column', alignItems: 'flex-start', gap: 1 }}>
+                      <Box sx={{ display: 'flex', gap: 1 }}>
+                        <TextField
+                          label="Enter your Gemini API Key"
+                          value={apiKeyInput}
+                          onChange={(e) => setApiKeyInput(e.target.value)}
+                          variant="outlined"
+                          size="small"
+                          sx={{ flex: 1 }}
+                        />
+                        <Button
+                          onClick={handleSetApiKey}
+                          variant="contained"
+                          color="primary"
+                        >
+                          Save
+                        </Button>
+                      </Box>
+                    </Box>
                     <Typography
                       variant="body2"
                       sx={{

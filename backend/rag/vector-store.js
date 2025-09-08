@@ -20,6 +20,13 @@ function cosineSimilarity(vecA, vecB) {
   return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
 }
 
+async function getEmbedding(text, apiKey) {
+  const genAI = new GoogleGenerativeAI(apiKey);
+  const model = genAI.getGenerativeModel({ model: 'text-embedding-004' });
+  const result = await model.embedContent(text);
+  return result.embedding.values;
+}
+
 /**
  * Loads the vector store from the filesystem into memory.
  */
@@ -54,8 +61,7 @@ async function rebuildAndSaveStore(files, apiKey) {
     const chunks = fileContent.split(/\n\s*\n/).filter(chunk => chunk.trim().length > 10);
     
     for (const chunk of chunks) {
-      const result = await model.embedContent(chunk);
-      const embedding = result.embedding.values;
+      const embedding = await getEmbedding(chunk, apiKey);
       vectorStore.push({ text: chunk, embedding });
     }
     fs.unlinkSync(file.path); // Clean up temp file
@@ -77,11 +83,7 @@ async function augmentMessageWithRagContext(message, apiKey) {
   }
 
   console.log('[RAG] Augmenting prompt with context...');
-  const genAI = new GoogleGenerativeAI(apiKey);
-  const model = genAI.getGenerativeModel({ model: 'text-embedding-004' });
-  
-  const queryResult = await model.embedContent(message);
-  const queryEmbedding = queryResult.embedding.values;
+  const queryEmbedding = await getEmbedding(message, apiKey);
 
   const searchResults = vectorStore.map(item => ({
     text: item.text,
@@ -107,4 +109,5 @@ module.exports = {
   initializeVectorStore,
   rebuildAndSaveStore,
   augmentMessageWithRagContext,
+  getEmbedding
 };

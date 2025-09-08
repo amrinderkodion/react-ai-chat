@@ -9,6 +9,7 @@ const cookieParser = require('cookie-parser');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const mime = require('mime-types');
 
 
 const RAG_ENABLED = 'true'; // process.env.RAG_ENABLED === 'true';
@@ -64,7 +65,7 @@ app.post('/api/set-key', (req, res) => {
 
 app.post('/api/upload', upload.array('files'), async (req, res) => {
   const apiKey = req.cookies.gemini_api_key; 
-  const { message,  history } = req.body;
+  const { message,  history, ragMode } = req.body;
   const files = req.files;
 
   const GEMINI_API_KEY = apiKey || process.env.GEMINI_API_KEY;
@@ -73,7 +74,7 @@ app.post('/api/upload', upload.array('files'), async (req, res) => {
   }
 
   let augmentedMessage = message;
-  if (RAG_ENABLED && message) {
+  if (RAG_ENABLED && ragMode == 'server' && message) {
     augmentedMessage = await augmentMessageWithRagContext(message, GEMINI_API_KEY);
   }
 
@@ -102,21 +103,28 @@ app.post('/api/upload', upload.array('files'), async (req, res) => {
   if (message) {
     currentParts.push({ text: message });
   } */
- const currentParts = [{ text: augmentedMessage }];
+  const currentParts = [{ text: augmentedMessage }];
 
-  if (Array.isArray(files) && files.length > 0) {
-    files.forEach(file => {
-      const fileBuffer = fs.readFileSync(file.path);
-      const base64Data = fileBuffer.toString('base64');
-      currentParts.push({
-        inlineData: {
-          data: base64Data,
-          mimeType: file.mimetype,
-        },
-      });
-      fs.unlinkSync(file.path);
+  files.forEach(file => {
+    const fileBuffer = fs.readFileSync(file.path);
+    const base64Data = fileBuffer.toString('base64');
+  
+    let mimeType = file.mimetype;
+    if (!mimeType || mimeType === 'application/octet-stream') {
+      // Guess from file extension
+      mimeType = mime.lookup(file.originalname) || 'application/octet-stream';
+    }
+  
+    currentParts.push({
+      inlineData: {
+        data: base64Data,
+        mimeType,
+      },
     });
-  }
+  
+    fs.unlinkSync(file.path);
+  });
+ 
 
   if (currentParts.length > 0) {
     contents.push({
