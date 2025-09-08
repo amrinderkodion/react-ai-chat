@@ -7,6 +7,11 @@ import Typography from '@mui/material/Typography';
 import Modal from '@mui/material/Modal';
 import CloseIcon from '@mui/icons-material/Close';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
+import ApiKeyInput from './ApiKeyInput.tsx';
+import SessionInfo from './SessionInfo.tsx';
+import SessionNotes from './SessionNotes.tsx';
+import { Session } from '../types.ts';
+
 
 interface SettingsModalProps {
     open: boolean;
@@ -17,6 +22,12 @@ interface SettingsModalProps {
     handleKnowledgeUpload: (event: React.ChangeEvent<HTMLInputElement>) => Promise<void>;
     knowledgeFileInputRef: React.RefObject<HTMLInputElement | null>; // Change this line
     loading: boolean;
+
+    activeSession: Session;
+    apiKeyInput: string;
+    setApiKeyInput: (key: string) => void;
+    handleSetApiKey: () => void;
+    updateSessionNotes: (id: string, notes: string) => void;
 }
 
 export default function SettingsModal({
@@ -28,6 +39,12 @@ export default function SettingsModal({
     handleKnowledgeUpload,
     knowledgeFileInputRef,
     loading,
+    
+    activeSession,
+    apiKeyInput,
+    setApiKeyInput,
+    handleSetApiKey,
+    updateSessionNotes,
 }: SettingsModalProps) {
     return (
         <Modal
@@ -65,7 +82,23 @@ export default function SettingsModal({
                 <Typography id="settings-modal-description" sx={{ mt: 2 }}>
                     Manage your application settings here.
                 </Typography>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap:4, flexWrap:'wrap', mt:4 }}>
+                    <SessionNotes
+                        notes={activeSession.notes || ''}
+                        onNotesChange={(notes) => updateSessionNotes(activeSession.id, notes)}
+                        styling={{flexGrow:1, flexShrink:0, flexBasis: '100%' }}
+                    />
+                    <Box sx={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 1 }}>
+                        <ApiKeyInput
+                            apiKeyInput={apiKeyInput}
+                            setApiKeyInput={setApiKeyInput}
+                            handleSetApiKey={handleSetApiKey}
+                        />
+                    </Box>
+                    <SessionInfo
+                        createdAt={activeSession.createdAt}
+                        messageCount={activeSession.messages.length}
+                    />
                     {isRagEnabled && (
                         <Box sx={{ alignSelf: 'flex-start', ml: 1, borderLeft: '1px solid #ddd', pl: 1, mt: 2 }}>
                             <Typography variant="body2" sx={{ fontWeight: 600 }} mb={1}>Knowledge Base</Typography>

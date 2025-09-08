@@ -8,6 +8,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@easylogic/react-summernote": "^0.1.4",
+    "@easylogic/react-summernote-lite": "^0.1.4",
     "@emotion/react": "^11",
     "@emotion/styled": "^11",
     "@mui/icons-material": "^7.3.1",
@@ -16,12 +18,14 @@
     "@types/react-router-dom": "^5.3.3",
     "@xenova/transformers": "^2.17.2",
     "idb": "^8.0.3",
+    "jquery": "^3.7.1",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-markdown": "^10.1.0",
     "react-router": "^7",
     "react-router-dom": "^7.8.2",
     "remark-gfm": "^4.0.1",
+    "summernote": "^0.9.1",
     "zod": "^3.24.2"
   },
   "devDependencies": {

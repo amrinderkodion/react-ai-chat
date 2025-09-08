@@ -151,7 +151,13 @@ export default function ManagerChatPage() {
                     knowledgeFileInputRef as React.RefObject<HTMLInputElement>
                 )}
                 knowledgeFileInputRef={knowledgeFileInputRef as React.RefObject<HTMLInputElement>}
-                loading={loading}
+                loading={loading} 
+
+                activeSession={active}
+                apiKeyInput={apiKeyInput}
+                setApiKeyInput={setApiKeyInput}
+                handleSetApiKey={() => handleSetApiKey(apiKeyInput, setNotification, setApiKeyInput)}
+                updateSessionNotes={updateSessionNotes}
             />
         </Box>
     );
