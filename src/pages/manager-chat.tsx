@@ -73,11 +73,14 @@ export default function ManagerChatPage() {
     };
 
     const deleteSession = (id: string) => {
-        const idx = sessions.findIndex(s => s.id === id);
         const next = sessions.filter(s => s.id !== id);
         setSessions(next);
-        if (id === activeId) {
-            setActiveId(next[idx] ? next[idx].id : next[0]?.id || '');
+        if (next.length > 0) {
+            if (id === activeId) {
+                setActiveId(next[0].id);
+            }
+        } else {
+            createNewSession();
         }
     };
 
@@ -87,6 +90,12 @@ export default function ManagerChatPage() {
 
     const updateSessionNotes = (id: string, notes: string) => {
         setSessions(prev => prev.map(s => (s.id === id ? { ...s, notes } : s)));
+    };
+
+    const handleClearAllSessions = () => {
+        localStorage.removeItem('manager_chat_sessions_v1');
+        setSessions([]);
+        createNewSession()
     };
 
     return (
@@ -99,6 +108,7 @@ export default function ManagerChatPage() {
                 deleteSession={deleteSession}
                 updateSessionTitle={updateSessionTitle}
                 exportSession={exportSession}
+                clearAllSessions={handleClearAllSessions}
             />
 
             <Box sx={{ flex: 1, width: 0, display: 'flex', flexDirection: 'column', height: '100%' }}>

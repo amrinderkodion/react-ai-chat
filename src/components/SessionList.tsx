@@ -29,6 +29,7 @@ interface SessionListProps {
     deleteSession: (id: string) => void;
     updateSessionTitle: (id: string, title: string) => void;
     exportSession: (s: Session) => void;
+    clearAllSessions: () => void;
 }
 
 export default function SessionList({
@@ -39,6 +40,7 @@ export default function SessionList({
     deleteSession,
     updateSessionTitle,
     exportSession,
+    clearAllSessions,
 }: SessionListProps) {
     return (
         <Paper elevation={3} sx={{ width: 300, p: 1, borderRadius: 3, height: '100%', overflowY: 'auto', bgcolor: '#f5f5f7' }}>
@@ -56,6 +58,7 @@ export default function SessionList({
                                 if (window.confirm('Clear all saved sessions?')) {
                                     localStorage.removeItem('manager_chat_sessions_v1');
                                     // You might need to handle resetting the state in the parent component
+                                    clearAllSessions();
                                 }
                             }}
                             color="error"

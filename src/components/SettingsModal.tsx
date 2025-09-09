@@ -83,11 +83,6 @@ export default function SettingsModal({
                     Manage your application settings here.
                 </Typography>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap:4, flexWrap:'wrap', mt:4 }}>
-                    <SessionNotes
-                        notes={activeSession.notes || ''}
-                        onNotesChange={(notes) => updateSessionNotes(activeSession.id, notes)}
-                        styling={{flexGrow:1, flexShrink:0, flexBasis: '100%' }}
-                    />
                     <Box sx={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 1 }}>
                         <ApiKeyInput
                             apiKeyInput={apiKeyInput}
