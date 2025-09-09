@@ -1,6 +1,7 @@
 // components/SettingsModal.tsx
 import * as React from 'react';
 import Box from '@mui/material/Box';
+import TextField from '@mui/material/TextField';
 import Button from '@mui/material/Button';
 import IconButton from '@mui/material/IconButton';
 import Typography from '@mui/material/Typography';
@@ -9,7 +10,6 @@ import CloseIcon from '@mui/icons-material/Close';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import ApiKeyInput from './ApiKeyInput.tsx';
 import SessionInfo from './SessionInfo.tsx';
-import SessionNotes from './SessionNotes.tsx';
 import { Session } from '../types.ts';
 
 
@@ -27,7 +27,7 @@ interface SettingsModalProps {
     apiKeyInput: string;
     setApiKeyInput: (key: string) => void;
     handleSetApiKey: () => void;
-    updateSessionNotes: (id: string, notes: string) => void;
+    updateSessionTitle: (id: string, title: string) => void;
 }
 
 export default function SettingsModal({
@@ -44,7 +44,7 @@ export default function SettingsModal({
     apiKeyInput,
     setApiKeyInput,
     handleSetApiKey,
-    updateSessionNotes,
+    updateSessionTitle
 }: SettingsModalProps) {
     return (
         <Modal
@@ -82,21 +82,34 @@ export default function SettingsModal({
                 <Typography id="settings-modal-description" sx={{ mt: 2 }}>
                     Manage your application settings here.
                 </Typography>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap:4, flexWrap:'wrap', mt:4 }}>
-                    <Box sx={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 1 }}>
-                        <ApiKeyInput
-                            apiKeyInput={apiKeyInput}
-                            setApiKeyInput={setApiKeyInput}
-                            handleSetApiKey={handleSetApiKey}
-                        />
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', gap:4, flexWrap:'wrap', mt:4 }}>
+                    <Box>
+                        <Typography variant="body2" sx={{ fontWeight:600 }}>
+                            Session Title
+                        </Typography>
+                        <TextField
+                            value={activeSession.title}
+                            onChange={e => updateSessionTitle(activeSession.id, e.target.value)}
+                            variant="outlined"
+                            size="small"
+                            sx={{ width: '100%', mb:2 }}
+                            InputProps={{ disableUnderline: true }}
+                        />    
+                        <Box sx={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 1 }}>
+                            <ApiKeyInput
+                                apiKeyInput={apiKeyInput}
+                                setApiKeyInput={setApiKeyInput}
+                                handleSetApiKey={handleSetApiKey}
+                            />
+                        </Box>
                     </Box>
                     <SessionInfo
                         createdAt={activeSession.createdAt}
                         messageCount={activeSession.messages.length}
                     />
                     {isRagEnabled && (
-                        <Box sx={{ alignSelf: 'flex-start', ml: 1, borderLeft: '1px solid #ddd', pl: 1, mt: 2 }}>
-                            <Typography variant="body2" sx={{ fontWeight: 600 }} mb={1}>Knowledge Base</Typography>
+                        <Box sx={{ alignSelf: 'flex-start' }}>
+                            <Typography variant="body2" sx={{ fontWeight: 600 }} mb={1}>Knowledge Base Upload</Typography>
                             <Typography variant="caption" display="block" color="text.secondary" mb={1}>
                                 Upload TXT or MD files <br />for the AI to use as context.
                             </Typography>
@@ -119,8 +132,8 @@ export default function SettingsModal({
                             </Button>
                         </Box>
                     )}
-                    <Box sx={{ p: 2, display: 'flex', flexDirection: 'column', alignItems: 'left', gap: 2 }}>
-                        <Typography variant="body2">RAG Mode:</Typography>
+                    <Box sx={{ p: 2, pt:0, display: 'flex', flexDirection: 'column', alignItems: 'left', gap: 2 }}>
+                        <Typography variant="body2" sx={{ fontWeight:600 }}>RAG Mode:</Typography>
                         <Button
                             variant={ragMode === 'server' ? 'contained' : 'outlined'}
                             onClick={() => setRagMode('server')}

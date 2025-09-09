@@ -167,7 +167,7 @@ export default function ManagerChatPage() {
                 apiKeyInput={apiKeyInput}
                 setApiKeyInput={setApiKeyInput}
                 handleSetApiKey={() => handleSetApiKey(apiKeyInput, setNotification, setApiKeyInput)}
-                updateSessionNotes={updateSessionNotes}
+                updateSessionTitle={updateSessionTitle}
             />
         </Box>
     );
