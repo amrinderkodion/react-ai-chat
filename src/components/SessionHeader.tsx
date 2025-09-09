@@ -53,6 +53,7 @@ export default function SessionHeader({
                 {sessionPanelExpanded && (
                     <Box sx={{ display: 'flex', flexDirection: 'row', gap: 1, width: '100%' }}>
                         <SessionNotes
+                            key={activeSession.id}
                             notes={activeSession.notes || ''}
                             onNotesChange={(notes) => updateSessionNotes(activeSession.id, notes)}
                         />

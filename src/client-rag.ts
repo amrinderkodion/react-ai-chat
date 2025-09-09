@@ -64,27 +64,34 @@ async function init(): Promise<void> {
 export async function processAndSaveKnowledge(files: File[]): Promise<void> {
   await init();
 
-  const tx = db!.transaction(STORE_NAME, 'readwrite');
-  const store = tx.objectStore(STORE_NAME);
+  const dataToStore: VectorData[] = [];
 
+  // Step 1: Process all files and get all embeddings first
   for (const file of files) {
     const text = await file.text();
     const chunks = text.match(/[^.!?]+/g) || [];
 
     for (const chunk of chunks) {
       if (chunk.length < 20) continue;
-      // Get embedding from the server instead of a local model
+      // Get embedding from the server without awaiting inside the loop
       const embedding = await getEmbeddingFromServer(chunk);
-      const data = {
+      dataToStore.push({
         id: crypto.randomUUID(),
         text: chunk,
         embedding: embedding,
-      };
-      await store.put(data);
+      });
     }
   }
 
-  await tx.done;
+  // Step 2: Open a single transaction and store all data
+  const tx = db!.transaction(STORE_NAME, 'readwrite');
+  const store = tx.objectStore(STORE_NAME);
+
+  for (const data of dataToStore) {
+    await store.put(data);
+  }
+
+  await tx.done; // Ensure the transaction completes
   console.log(`Successfully indexed ${files.length} file(s) locally.`);
 }
 
