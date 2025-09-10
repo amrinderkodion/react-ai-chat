@@ -32,9 +32,9 @@ export default function SessionHeader({
     const [sessionPanelExpanded, setSessionPanelExpanded] = React.useState(true);
 
     return (
-        <Box sx={{ display: 'flex', gap: 1, mb: 1, justifyContent: 'flex-end', alignItems: 'center' }}>
+        <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end', alignItems: 'center' }}>
             <Paper sx={{ width: '100%', p: 1, borderRadius: 2, bgcolor: '#fafafa', position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'stretch' }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between'}}>
                     <Typography variant="body2" sx={{ fontWeight: 600 }}>Session Details</Typography>
                     &emsp;
                     <SettingsButton onClick={() => setIsSettingsModalOpen(true)} />

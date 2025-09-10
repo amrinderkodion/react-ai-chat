@@ -5,6 +5,7 @@ const multer = require('multer');
 const { initializeVectorStore, augmentMessageWithRagContext } = require('./rag/vector-store.js');
 const ragRoutes = require('./rag/rag-routes.js');
 const cookieParser = require('cookie-parser');
+const { v4: uuidv4 } = require('uuid');
 
 
 const app = express();
@@ -25,8 +26,24 @@ if (!fs.existsSync(uploadDir)) {
 }
 const upload = multer({ dest: uploadDir });
 
-app.use((req, res, next) => {
+/* app.use((req, res, next) => {
   console.log(new Date().toISOString(), req.method, req.url);
+  next();
+}); */
+app.use((req, res, next) => {
+  let userId = req.cookies.userId;
+
+  if (!userId) {
+    userId = uuidv4();
+    
+    res.cookie('userId', userId, {
+      httpOnly: true,
+      maxAge: 60 * 24 * 60 * 60 * 1000, 
+    });
+    console.log(`[AUTH] New user ID assigned: ${userId}`);
+  }
+  
+  req.userId = userId;
   next();
 });
 
@@ -57,7 +74,7 @@ app.post('/api/set-key', (req, res) => {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production', // Use secure in production
     sameSite: 'strict',
-    maxAge: 3600000 * 24 * 60 // 24 hours
+    maxAge: 3600000 * 24 * 60 
   });
 
   res.status(200).json({ message: 'API key successfully set.' });
