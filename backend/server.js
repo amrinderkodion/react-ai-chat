@@ -30,7 +30,7 @@ const upload = multer({ dest: uploadDir });
   console.log(new Date().toISOString(), req.method, req.url);
   next();
 }); */
-app.use((req, res, next) => {
+/* app.use((req, res, next) => {
   let userId = req.cookies.userId;
 
   if (!userId) {
@@ -45,7 +45,7 @@ app.use((req, res, next) => {
   
   req.userId = userId;
   next();
-});
+}); */
 
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());

@@ -33,7 +33,7 @@ export default function SessionHeader({
 
     return (
         <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end', alignItems: 'center' }}>
-            <Paper sx={{ width: '100%', p: 1, borderRadius: 2, bgcolor: '#fafafa', position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'stretch' }}>
+            <Paper sx={{ width: '100%', p: 1, borderRadius: 2, mb:1, bgcolor: '#fafafa', position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'stretch' }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between'}}>
                     <Typography variant="body2" sx={{ fontWeight: 600 }}>Session Details</Typography>
                     &emsp;
@@ -51,11 +51,12 @@ export default function SessionHeader({
                     </IconButton>
                 </Box>
                 {sessionPanelExpanded && (
-                    <Box sx={{ display: 'flex', flexDirection: 'row', gap: 1, width: '100%' }}>
+                    <Box sx={{ display: 'flex', flexDirection: 'row', gap: 1, width: '100%', mt:1 }}>
                         <SessionNotes
                             key={activeSession.id}
                             notes={activeSession.notes || ''}
                             onNotesChange={(notes) => updateSessionNotes(activeSession.id, notes)}
+                            styling={{width:'95%'}}
                         />
                         <SessionInfo
                             createdAt={activeSession.createdAt}
