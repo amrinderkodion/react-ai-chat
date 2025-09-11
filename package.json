@@ -20,16 +20,15 @@
     "react-markdown": "^10.1.0",
     "react-router": "^7",
     "react-router-dom": "^7.8.2",
-    "remark-gfm": "^4.0.1"
+    "remark-gfm": "^4.0.1",
+    "suneditor": "^2.47.7",
+    "suneditor-react": "^3.6.1"
   },
   "devDependencies": {
-    "@ckeditor/ckeditor5-react": "^11.0.0",
-    "@types/jquery": "^3.5.33",
     "@types/node": "^24.3.0",
     "@types/react": "^19.1.12",
     "@types/react-dom": "^19.1.8",
     "@vitejs/plugin-react": "^4.3.2",
-    "ckeditor5": "^46.0.3",
     "typescript": "^5",
     "vite": "^5.4.8"
   }
