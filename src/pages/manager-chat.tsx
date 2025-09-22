@@ -28,7 +28,7 @@ export default function ManagerChatPage() {
     const [loading, setLoading] = useState(false);
     const [apiKeyInput, setApiKeyInput] = useState('');
     const [notification, setNotification] = useState({ open: false, message: '' });
-    const [ragMode, setRagMode] = useState<'server' | 'client'>('server');
+    const [ragMode, setRagMode] = useState<'server' | 'client'>('client');
     const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
     const [files, setFiles] = useState<File[]>([]);
     const [isRagEnabled, setIsRagEnabled] = useState(false);

@@ -50,8 +50,6 @@ function initializeVectorStore() {
  * @param {string} apiKey - The Gemini API key.
  */
 async function rebuildAndSaveStore(files, apiKey) {
-  const genAI = new GoogleGenerativeAI(apiKey);
-  const model = genAI.getGenerativeModel({ model: 'text-embedding-004' });
 
   vectorStore = []; // Clear previous knowledge
   console.log('[RAG] Cleared existing vector store for re-indexing.');
@@ -95,14 +93,14 @@ async function augmentMessageWithRagContext(message, apiKey) {
   const context = searchResults.map(r => r.text).join('\n---\n');
   
   return `
-Based on the following context, please answer the user's question. If the context does not contain the answer, state that you cannot find the information in the provided documents.
+    Based on the following context, please answer the user's question. If the context does not contain the answer, state that you cannot find the information in the provided documents.
 
-## Context:
-${context}
+    ## Context:
+    ${context}
 
-## User's Question:
-${message}
-`;
+    ## User's Question:
+    ${message}  
+  `;
 }
 
 module.exports = {

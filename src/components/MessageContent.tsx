@@ -199,7 +199,9 @@ const MessageContent = ({ text, sender }:MessageContentProps) => {
 };
 
 const cleanMarkdown = (markdown: string): string => {
-  return markdown
+  const withRealNewlines = markdown.replace(/\\n/g, '\n');
+
+  return withRealNewlines
     .split('\n')
     .map(line => line.trim())
     .join('\n');

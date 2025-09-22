@@ -29,7 +29,7 @@ export default function SessionHeader({
     updateSessionNotes,
     setIsSettingsModalOpen,
 }: SessionHeaderProps) {
-    const [sessionPanelExpanded, setSessionPanelExpanded] = React.useState(true);
+    const [sessionPanelExpanded, setSessionPanelExpanded] = React.useState(false);
 
     return (
         <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end', alignItems: 'center' }}>
@@ -46,6 +46,30 @@ export default function SessionHeader({
                             handleSetApiKey={handleSetApiKey}
                         />
                     </Box>
+                    <Typography
+                        variant="body2"
+                        sx={{
+                            width: 'auto',
+                            fontSize: 14,
+                            display: 'block',
+                            whiteSpace: 'normal',
+                            wordBreak: 'keep-all',
+                        }}
+                    >
+                        Created:{' '}
+                        {new Date(activeSession.createdAt).toLocaleDateString()}
+                        {' '}
+                        {(() => {
+                            const d = new Date(activeSession.createdAt);
+                            const timeParts = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
+                            return (
+                                <>
+                                    {timeParts}
+                                </>
+                            );
+                        })()}
+                    </Typography>
+                    &nbsp;
                     <IconButton size="small" onClick={() => setSessionPanelExpanded(e => !e)}>
                         {sessionPanelExpanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
                     </IconButton>

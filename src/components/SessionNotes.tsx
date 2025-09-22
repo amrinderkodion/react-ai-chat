@@ -21,7 +21,7 @@ export default function SessionNotes({
         setContents={notes}
         onChange={onNotesChange}
         setOptions={{
-          height: "400px",
+          height: "50px",
           buttonList: [
             // Toolbar buttons
             ["undo", "redo"],
